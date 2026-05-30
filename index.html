@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Azari's Bug Hunt" />
+<meta name="theme-color" content="#7bd151" />
+<title>🐛 Azari's Bug Hunt 🔍</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; overflow:hidden; font-family:"Comic Sans MS","Trebuchet MS",system-ui,sans-serif; user-select:none; }
+  body { touch-action:manipulation; cursor:default; background:#8fd3ff; }
+
+  /* ---------- Scene ---------- */
+  #scene { position:absolute; inset:0; z-index:5; transition:background .5s; }
+  .decor { position:absolute; z-index:2; filter:drop-shadow(0 3px 4px rgba(0,0,0,.15)); pointer-events:none; line-height:1; }
+
+  /* ---------- HUD ---------- */
+  #hud { position:absolute; top:0; left:0; right:0; z-index:30; display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px; pointer-events:none; }
+  .hud-btn { pointer-events:auto; cursor:pointer; border:none; font-family:inherit; font-weight:bold;
+    background:rgba(255,255,255,.92); border-radius:999px; padding:9px 16px; font-size:clamp(15px,3.6vw,22px);
+    color:#2c7a2c; box-shadow:0 4px 0 rgba(0,0,0,.12),0 8px 16px rgba(0,0,0,.15); display:flex; align-items:center; gap:6px;
+    transition:transform .08s; white-space:nowrap; }
+  .hud-btn:active { transform:translateY(3px); }
+  #quiz-btn { color:#c44; }
+  #quiz-btn[disabled] { opacity:.45; filter:grayscale(.5); cursor:default; }
+  #azari-badge { color:#9b59b6; }
+
+  /* scene name banner */
+  #scene-name { position:absolute; top:54px; left:50%; transform:translateX(-50%); z-index:28;
+    background:rgba(255,255,255,.9); border-radius:999px; padding:6px 22px; font-weight:bold;
+    font-size:clamp(18px,4.6vw,28px); color:#444; box-shadow:0 4px 12px rgba(0,0,0,.2); white-space:nowrap; }
+
+  /* nav arrows */
+  .nav { position:absolute; top:50%; transform:translateY(-50%); z-index:29; cursor:pointer; border:none;
+    background:rgba(255,255,255,.85); width:clamp(48px,12vw,64px); height:clamp(48px,12vw,64px); border-radius:50%;
+    font-size:clamp(26px,6vw,38px); color:#2c7be5; box-shadow:0 5px 0 rgba(0,0,0,.15),0 8px 16px rgba(0,0,0,.2);
+    display:flex; align-items:center; justify-content:center; transition:transform .08s; }
+  .nav:active { transform:translateY(-50%) scale(.92); }
+  #prev { left:8px; } #next { right:8px; }
+
+  /* ---------- Hotspots ---------- */
+  .spot { position:absolute; z-index:8; cursor:pointer; text-align:center; transition:transform .12s; transform:translateX(-50%); }
+  .spot:active { transform:translateX(-50%) scale(.92); }
+  .spot .art { font-size:clamp(46px,11vw,84px); line-height:1; filter:drop-shadow(0 6px 6px rgba(0,0,0,.3)); display:inline-block; }
+  .spot.searched .art { animation:rustle .5s ease; }
+  @keyframes rustle { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-10deg)} 75%{transform:rotate(10deg)} }
+  .spot .label { display:block; margin-top:2px; font-size:clamp(11px,2.6vw,15px); font-weight:bold; color:#fff;
+    text-shadow:0 2px 3px rgba(0,0,0,.6); background:rgba(0,0,0,.28); border-radius:999px; padding:2px 10px; }
+  .hint { position:absolute; top:-6px; right:-2px; font-size:20px; animation:bob 1.3s ease-in-out infinite; }
+  @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+  .found-bug { position:absolute; z-index:14; font-size:clamp(40px,9vw,68px); pointer-events:none;
+    animation:popup .5s cubic-bezier(.2,1.4,.4,1); filter:drop-shadow(0 4px 4px rgba(0,0,0,.3)); transform:translate(-50%,0); }
+  @keyframes popup { 0%{transform:translate(-50%,10px) scale(0)} 100%{transform:translate(-50%,-44px) scale(1)} }
+
+  /* ---------- emoji disc (bug icon on colored circle) ---------- */
+  .disc { display:inline-flex; align-items:center; justify-content:center; border-radius:50%;
+    box-shadow:inset 0 -6px 12px rgba(0,0,0,.18), 0 3px 6px rgba(0,0,0,.2); }
+
+  /* ---------- Magnifier cursor ---------- */
+  #lens { position:fixed; z-index:60; font-size:40px; pointer-events:none; transform:translate(-30%,-70%); display:none;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.4)); }
+
+  /* ---------- Overlays / cards ---------- */
+  .overlay { position:absolute; inset:0; z-index:50; display:none; align-items:center; justify-content:center; padding:14px;
+    background:rgba(20,30,20,.55); backdrop-filter:blur(3px); }
+  .overlay.show { display:flex; }
+  .card { background:#fffef7; border-radius:28px; padding:22px 20px; max-width:520px; width:100%; text-align:center;
+    box-shadow:0 16px 50px rgba(0,0,0,.4); border:6px solid #ffd23f; animation:cardin .3s cubic-bezier(.2,1.3,.4,1);
+    max-height:92vh; overflow-y:auto; }
+  @keyframes cardin { from{transform:scale(.7); opacity:0} to{transform:scale(1); opacity:1} }
+  .bug-disc { margin:4px auto 6px; }
+  .bug-name { font-size:clamp(26px,6.5vw,40px); font-weight:bold; color:#e0479e; margin:4px 0 2px; }
+  .bug-tag { display:inline-block; font-size:clamp(12px,2.9vw,17px); font-weight:bold; color:#fff; background:#5aa9ff;
+    border-radius:999px; padding:3px 14px; margin-bottom:12px; }
+  .bug-tag.notbug { background:#ff8c42; }
+  .facts { text-align:left; margin:0 auto 14px; max-width:430px; }
+  .facts li { list-style:none; font-size:clamp(15px,3.7vw,21px); color:#3a4a3a; margin:9px 0; line-height:1.35;
+    display:flex; gap:10px; align-items:flex-start; }
+  .facts li .fi { font-size:1.3em; flex-shrink:0; }
+  .card-btns { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+  .pill-btn { cursor:pointer; border:none; font-family:inherit; font-weight:bold; font-size:clamp(17px,4.2vw,25px);
+    padding:13px 26px; border-radius:999px; color:#fff; transition:transform .08s; }
+  .pill-btn:active { transform:translateY(4px); }
+  .btn-hear { background:linear-gradient(180deg,#5aa9ff,#2c7be5); box-shadow:0 6px 0 #1a5bb5; }
+  .btn-go   { background:linear-gradient(180deg,#7bd151,#4caf50); box-shadow:0 6px 0 #3a8a3a; }
+
+  /* ---------- Azari Bug special ---------- */
+  .azari-card { border:none !important; background:#1b1033; color:#fff; position:relative; overflow:visible; }
+  .azari-card .bug-name { color:#fff; text-shadow:0 0 14px #ff5fa2; }
+  .azari-card .facts li { color:#ffe9ff; }
+  .azari-card::before { content:""; position:absolute; inset:-6px; border-radius:32px; z-index:-1;
+    background:linear-gradient(60deg,#ff5fa2,#ffd23f,#4caf50,#5aa9ff,#b06bff,#ff5fa2);
+    background-size:300% 300%; animation:rainbowborder 3s linear infinite; }
+  @keyframes rainbowborder { to { background-position:300% 0; } }
+  .azari-creature { position:relative; display:inline-block; margin:6px auto 4px; }
+  .ac-body { display:inline-block; font-size:clamp(74px,18vw,118px); line-height:1;
+    animation:achue 3s linear infinite, acbob 1.6s ease-in-out infinite; }
+  @keyframes achue {
+    0%{filter:hue-rotate(0deg) drop-shadow(0 0 16px #ff5fa2)}
+    50%{filter:hue-rotate(180deg) drop-shadow(0 0 22px #5aa9ff)}
+    100%{filter:hue-rotate(360deg) drop-shadow(0 0 16px #b06bff)} }
+  @keyframes acbob { 0%,100%{transform:translateY(0) rotate(-5deg)} 50%{transform:translateY(-8px) rotate(5deg)} }
+  .ac-crown { position:absolute; top:-18px; left:50%; transform:translateX(-50%); font-size:clamp(30px,7vw,46px); animation:acbob 1.6s ease-in-out infinite; }
+  .ac-spark { position:absolute; font-size:24px; animation:twinkle 1.4s ease-in-out infinite; }
+  .ac-spark.s1{ top:0; left:-10px; } .ac-spark.s2{ top:10px; right:-10px; animation-delay:.4s; }
+  .ac-spark.s3{ bottom:-4px; left:6px; animation-delay:.8s; } .ac-spark.s4{ bottom:6px; right:0; animation-delay:.2s; }
+  @keyframes twinkle { 0%,100%{opacity:.3; transform:scale(.7)} 50%{opacity:1; transform:scale(1.2)} }
+
+  /* ---------- Collection ---------- */
+  .scene-head { display:flex; align-items:center; gap:8px; font-weight:bold; font-size:clamp(15px,3.6vw,19px);
+    color:#444; margin:14px 0 6px; padding-bottom:4px; border-bottom:3px solid #eee; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(72px,1fr)); gap:10px; }
+  .slot { background:#f0f0e6; border-radius:16px; padding:8px 3px 6px; border:3px dashed #cfcabb; }
+  .slot.have { background:#eafce0; border:3px solid #7bd151; cursor:pointer; }
+  .slot .sn { font-size:11px; font-weight:bold; color:#3a4a3a; margin-top:4px; line-height:1.1; }
+  .slot.miss .qm { font-size:34px; color:#ccc; line-height:1; }
+  .slot.miss .sn { color:#bbb; }
+
+  /* ---------- Quiz ---------- */
+  #quiz-progress { font-size:clamp(13px,3.3vw,17px); color:#888; font-weight:bold; margin-bottom:6px; }
+  .q-disc { margin:2px auto 10px; }
+  #quiz-q { font-size:clamp(20px,5vw,30px); font-weight:bold; color:#2c7a2c; margin:0 0 14px; line-height:1.25; }
+  .answers { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .ans { cursor:pointer; border:none; font-family:inherit; font-weight:bold; font-size:clamp(16px,4vw,24px);
+    padding:16px 8px; border-radius:20px; background:#fff; border:4px solid #ffd23f; color:#3a4a3a;
+    box-shadow:0 5px 0 rgba(0,0,0,.12); transition:transform .08s; }
+  .ans:active { transform:translateY(3px); }
+  .ans.right { background:#bdf5a3; border-color:#4caf50; animation:rightpop .4s; }
+  .ans.wrong { background:#ffd0d0; border-color:#ff6b6b; animation:shake .4s; }
+  @keyframes rightpop { 0%{transform:scale(1)} 50%{transform:scale(1.12)} 100%{transform:scale(1)} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+  #quiz-feedback { min-height:28px; font-size:clamp(17px,4.2vw,25px); font-weight:bold; margin-top:12px; }
+
+  .particle { position:absolute; z-index:55; pointer-events:none; border-radius:3px; }
+
+  /* ---------- Title ---------- */
+  #title { position:absolute; inset:0; z-index:80; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:18px; text-align:center; padding:20px; background:radial-gradient(circle at 50% 38%,rgba(255,255,255,.4),rgba(120,200,120,.6)); }
+  #title h1 { font-size:clamp(38px,11vw,86px); color:#fff; text-shadow:0 5px 0 #4caf50,0 12px 22px rgba(0,0,0,.25); line-height:1.05; }
+  #title .sub { font-size:clamp(16px,4.2vw,25px); color:#fff; text-shadow:0 2px 4px rgba(0,0,0,.3); max-width:560px; }
+  .crawl { font-size:clamp(38px,10vw,66px); }
+  .start-btn { cursor:pointer; border:none; font-family:inherit; font-weight:bold; font-size:clamp(26px,6.5vw,44px);
+    color:#fff; background:linear-gradient(180deg,#ffd23f,#ff8c42); padding:18px 50px; border-radius:999px;
+    box-shadow:0 8px 0 #e36414,0 14px 28px rgba(0,0,0,.3); transition:transform .08s,box-shadow .08s; }
+  .start-btn:active { transform:translateY(6px); box-shadow:0 2px 0 #e36414; }
+</style>
+</head>
+<body>
+  <div id="scene"></div>
+
+  <div id="hud">
+    <button class="hud-btn" id="jar-btn">🫙 <span id="jar-count">0</span>/100</button>
+    <button class="hud-btn" id="azari-badge">🌈 <span id="azari-count">0</span></button>
+    <button class="hud-btn" id="quiz-btn" disabled>🧠 Quiz</button>
+  </div>
+  <div id="scene-name"></div>
+  <button class="nav" id="prev">◀</button>
+  <button class="nav" id="next">▶</button>
+
+  <div id="lens">🔍</div>
+
+  <div class="overlay" id="bug-overlay"><div class="card" id="bug-card"></div></div>
+
+  <div class="overlay" id="jar-overlay">
+    <div class="card">
+      <div class="bug-name" style="color:#4caf50">🫙 Azari's Bug Jar</div>
+      <div class="bug-tag" id="jar-sub" style="background:#7bd151">Keep hunting!</div>
+      <div id="jar-body"></div>
+      <div class="card-btns" style="margin-top:14px"><button class="pill-btn btn-go" onclick="closeAll()">Back to Hunting!</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="quiz-overlay">
+    <div class="card">
+      <div id="quiz-progress"></div>
+      <div class="q-disc" id="quiz-disc"></div>
+      <div id="quiz-q"></div>
+      <div class="answers" id="quiz-answers"></div>
+      <div id="quiz-feedback"></div>
+    </div>
+  </div>
+
+  <div id="title">
+    <div class="crawl">🐞 🦋 🐜 🐝 🕷️ 🦂 🦀</div>
+    <h1>Azari's<br>Bug Hunt</h1>
+    <div class="sub">Hi Azari! 👋 Travel to 10 different places, dig and search to find <b>100 real bugs</b>, and learn cool facts. Watch out for the secret <b>🌈 Azari Bug</b>... and try the Bug Quiz!</div>
+    <button class="start-btn" id="start-btn">▶ Let's Hunt, Azari!</button>
+  </div>
+
+<script>
+const NAME = "Azari";
+
+/* =========================================================================
+   SCENES — each habitat has its own background + decorations + dig spots
+   ========================================================================= */
+const SCENES = [
+  { id:"garden", name:"Garden",     emoji:"🌻", ink:"#2c7a2c",
+    bg:"linear-gradient(180deg,#8fd3ff 0%,#bfe9ff 45%,#7bd151 46%,#5cb646 100%)",
+    decor:["🌻","🌼","🌷","☁️"], spots:["🪨","🌿","🌸","🕳️"] },
+  { id:"pond", name:"Pond",         emoji:"💧", ink:"#1b6ca8",
+    bg:"linear-gradient(180deg,#aed6f1 0%,#5dade2 40%,#2e86c1 41%,#1b4f72 100%)",
+    decor:["🪷","🌊","🦆","☁️"], spots:["🪷","🌊","🪨","💧"] },
+  { id:"forest", name:"Forest Floor", emoji:"🌲", ink:"#5d4037",
+    bg:"linear-gradient(180deg,#5d8a3a 0%,#3e5622 45%,#6e4621 46%,#3e2611 100%)",
+    decor:["🌲","🍄","🪵","🌿"], spots:["🪵","🍄","🌿","🪨"] },
+  { id:"night", name:"Night",       emoji:"🌙", ink:"#5dade2",
+    bg:"linear-gradient(180deg,#0b1026 0%,#1a2347 60%,#243b1f 61%,#11220f 100%)",
+    decor:["🌙","⭐","✨","⭐"], spots:["🌙","🪨","🌿","🪵"] },
+  { id:"meadow", name:"Meadow",     emoji:"🌾", ink:"#b9770e",
+    bg:"linear-gradient(180deg,#aed6f1 0%,#f9e79f 45%,#f4d03f 46%,#d4ac0d 100%)",
+    decor:["🌾","🌼","☀️","🦋"], spots:["🌾","🌼","🌿","🪨"] },
+  { id:"jungle", name:"Jungle",     emoji:"🌴", ink:"#0b5345",
+    bg:"linear-gradient(180deg,#1e8449 0%,#145a32 40%,#0b3d20 41%,#052e14 100%)",
+    decor:["🌴","🌿","🦜","🍃"], spots:["🌴","🌿","🪵","🍄"] },
+  { id:"desert", name:"Desert",     emoji:"🏜️", ink:"#9c640c",
+    bg:"linear-gradient(180deg,#fdebd0 0%,#f9c784 45%,#e59866 46%,#ca6f1e 100%)",
+    decor:["🌵","☀️","🏜️","🌵"], spots:["🌵","🪨","🏜️","🕳️"] },
+  { id:"beach", name:"Beach",       emoji:"🏖️", ink:"#1b6ca8",
+    bg:"linear-gradient(180deg,#aed6f1 0%,#85c1e9 38%,#5dade2 48%,#f9e79f 50%,#f5cba7 100%)",
+    decor:["🐚","🌊","⛱️","🐚"], spots:["🐚","🌊","🪨","🏖️"] },
+  { id:"house", name:"In the House", emoji:"🏠", ink:"#7d3c98",
+    bg:"linear-gradient(180deg,#d6eaf8 0%,#aed6f1 55%,#b9770e 56%,#7e5109 100%)",
+    decor:["🪟","🛋️","🖼️","🪴"], spots:["🛋️","🪟","📦","🧦"] },
+  { id:"spring", name:"Flower Patch", emoji:"🌷", ink:"#c0392b",
+    bg:"linear-gradient(180deg,#d6eaf8 0%,#fadbd8 45%,#a9dfbf 46%,#82e0aa 100%)",
+    decor:["🌷","🌸","🌼","🦋"], spots:["🌷","🌸","🌿","🪨"] },
+];
+
+/* =========================================================================
+   100 REAL BUGS — B(id, name, emoji, color, scene, insect, legs, eats, fact1, fact2)
+   legs: "6" "8" "10" "lots" "none"
+   ========================================================================= */
+function B(id,name,emoji,color,scene,insect,legs,eats,f1,f2){return {id,name,emoji,color,scene,insect,legs,eats,facts:[f1,f2]};}
+const BUGS = [
+  // ---- GARDEN ----
+  B("ladybug","Ladybug","🐞","#e74c3c","garden",true,"6","aphids","Its bright spots warn birds it tastes yucky.","One ladybug can eat 50 aphids in a day!"),
+  B("honeybee","Honeybee","🐝","#f1c40f","garden",true,"6","nectar","It makes sweet honey from flower nectar.","It does a wiggly dance to share where flowers are."),
+  B("butterfly","Butterfly","🦋","#9b59b6","garden",true,"6","nectar","It tastes food with its feet!","It used to be a wriggly caterpillar."),
+  B("caterpillar","Caterpillar","🐛","#8bc34a","garden",true,"lots","leaves","It eats lots of leaves to grow big.","It will turn into a butterfly or moth."),
+  B("gardenant","Garden Ant","🐜","#6d4c41","garden",true,"6","crumbs","It can lift 50 times its own weight.","Ants talk to each other using smells."),
+  B("grasshopper","Grasshopper","🦗","#27ae60","garden",true,"6","grass","It can jump 20 times its own body length.","It sings by rubbing its legs together."),
+  B("snail","Garden Snail","🐌","#a1887f","garden",false,"none","leaves","It carries its shell house everywhere.","A snail is a mollusk, not an insect."),
+  B("earthworm","Earthworm","🪱","#d98880","garden",false,"none","dead leaves","It makes the dirt healthy for plants.","It has no eyes but can feel light."),
+  B("gardenspider","Garden Spider","🕷️","#34495e","garden",false,"8","flies","It has 8 legs, so it is not an insect.","It spins silky webs to catch food."),
+  B("pillbug","Roly-Poly","🪲","#607d8b","garden",false,"lots","dead leaves","It rolls into a tiny ball when scared.","It's a crustacean — a cousin of crabs!"),
+
+  // ---- POND ----
+  B("dragonfly","Dragonfly","🪰","#00bcd4","pond",true,"6","mosquitoes","It can fly backwards and hover in place!","Dragonflies have lived since the dinosaurs."),
+  B("damselfly","Damselfly","🪰","#16a085","pond",true,"6","tiny bugs","It folds its wings up when it rests.","It's the dainty cousin of the dragonfly."),
+  B("waterstrider","Water Strider","🦟","#5dade2","pond",true,"6","small bugs","It walks right on top of the water!","Tiny hairs on its feet stop it from sinking."),
+  B("mosquito","Mosquito","🦟","#7f8c8d","pond",true,"6","blood","Only the females bite for a blood snack.","Its buzz comes from super-fast wings."),
+  B("mayfly","Mayfly","🪰","#aed6f1","pond",true,"6","algae","Some live just one day as grown-ups!","It spends its baby life underwater."),
+  B("divingbeetle","Diving Beetle","🪲","#1f618d","pond",true,"6","tiny fish","It carries a bubble of air to breathe underwater.","It paddles with strong swimming legs."),
+  B("backswimmer","Backswimmer","🪲","#2874a6","pond",true,"6","bugs","It swims upside down on its back!","It rows with legs shaped like oars."),
+  B("waterboatman","Water Boatman","🪲","#2980b9","pond",true,"6","algae","It rows through the water like a little boat.","It can chirp a song underwater."),
+  B("caddisfly","Caddisfly","🪰","#48c9b0","pond",true,"6","plant bits","Its babies build cozy cases from sand and sticks.","It only lives near clean water."),
+  B("whirligig","Whirligig Beetle","🪲","#117a65","pond",true,"6","bugs","It spins in fast little circles on the water.","Its eyes see above AND below water at once!"),
+
+  // ---- FOREST FLOOR ----
+  B("centipede","Centipede","🐛","#c0392b","forest",false,"lots","bugs","It has one pair of legs on each body part.","'Centi' means hundred — it's a speedy hunter!"),
+  B("millipede","Millipede","🐛","#784212","forest",false,"lots","dead leaves","It has TWO pairs of legs on each body part.","It curls into a spiral when it feels scared."),
+  B("stagbeetle","Stag Beetle","🪲","#5d4037","forest",true,"6","tree sap","Males have huge jaws like deer antlers.","Its grubs live for years inside old logs."),
+  B("woodant","Wood Ant","🐜","#6e2c00","forest",true,"6","bugs","It builds giant nest mounds from pine needles.","It can squirt acid to guard its home."),
+  B("earwig","Earwig","🪲","#7b3f00","forest",true,"6","plants","It has little pincers on its tail.","It's a caring mom that guards its eggs."),
+  B("slug","Slug","🐌","#95a5a6","forest",false,"none","mushrooms","It's like a snail with no shell.","It glides along on a trail of slime."),
+  B("groundbeetle","Ground Beetle","🪲","#1c2833","forest",true,"6","bugs","It runs fast to hunt other bugs at night.","It helps gardeners by eating pests."),
+  B("daddylonglegs","Daddy Longlegs","🕷️","#b9770e","forest",false,"8","tiny bits","It has 8 super-long legs but spins no web.","It's not a true spider and can't bite you."),
+  B("woodlouse","Woodlouse","🪲","#839192","forest",false,"lots","rotting wood","It breathes with gills and loves damp logs.","It's a land cousin of crabs and shrimp."),
+  B("barkbeetle","Bark Beetle","🪲","#6e4621","forest",true,"6","wood","It carves tunnels just under tree bark.","Tiny but a mighty wood-muncher."),
+
+  // ---- NIGHT ----
+  B("firefly","Firefly","🪲","#f4d03f","night",true,"6","tiny bugs","It glows in its belly to talk to friends.","A firefly is really a beetle, not a fly!"),
+  B("moth","Moth","🦋","#7d6608","night",true,"6","nectar","It flies at night and loves the moonlight.","It has feathery antennae to smell with."),
+  B("lunamoth","Luna Moth","🦋","#58d68d","night",true,"6","nothing","It has big green wings with long tails.","As an adult it doesn't eat at all!"),
+  B("cockroach","Cockroach","🪳","#515a5a","night",true,"6","crumbs","It can run fast and squeeze super flat.","It has lived on Earth for millions of years."),
+  B("cricket","Field Cricket","🦗","#2c3e50","night",true,"6","plants","The males chirp a song at night.","It chirps faster when the night is warm."),
+  B("glowworm","Glow-worm","🪲","#cddc39","night",true,"lots","snails","The female glows green to find a mate.","It's actually the baby of a beetle."),
+  B("junebug","June Bug","🪲","#6e2c00","night",true,"6","leaves","It bonks into porch lights on summer nights.","Its grubs grow up underground."),
+  B("katydid","Katydid","🦗","#229954","night",true,"6","leaves","It looks just like a green leaf!","It sings a song that sounds like 'katy-did'."),
+  B("scorpion","Scorpion","🦂","#7e5109","night",false,"8","bugs","It glows blue under special UV light!","With 8 legs, it's an arachnid like spiders."),
+  B("lacewing","Lacewing","🪰","#a9dfbf","night",true,"6","aphids","It has delicate, see-through green wings.","Its hungry babies gobble up aphids."),
+
+  // ---- MEADOW ----
+  B("monarch","Monarch Butterfly","🦋","#e67e22","meadow",true,"6","nectar","It flies thousands of miles to migrate.","Bright orange warns birds it tastes bad."),
+  B("bumblebee","Bumblebee","🐝","#f39c12","meadow",true,"6","nectar","Fuzzy and round, it flies even in cool weather.","It buzzes flowers to shake the pollen loose."),
+  B("mantis","Praying Mantis","🦗","#196f3d","meadow",true,"6","other bugs","It holds its arms like it is praying.","It can turn its head almost all the way around."),
+  B("leafhopper","Leafhopper","🦗","#82e0aa","meadow",true,"6","plant juice","It hops away in a flash when scared.","It comes in amazing rainbow colors."),
+  B("hoverfly","Hoverfly","🪰","#f7dc6f","meadow",true,"6","nectar","It looks like a bee but it cannot sting.","It hovers in one spot like a tiny helicopter."),
+  B("paintedlady","Painted Lady","🦋","#d35400","meadow",true,"6","nectar","One of the most common butterflies on Earth.","It travels across whole continents."),
+  B("fieldgrass","Meadow Grasshopper","🦗","#7dcea0","meadow",true,"6","grass","Its big back legs leap it away from danger.","It can spit yucky juice to scare predators."),
+  B("ladybirdlarva","Baby Ladybug","🐛","#cb4335","meadow",true,"lots","aphids","Baby ladybugs look like tiny dragons.","They eat even more aphids than grown-ups!"),
+  B("paperwasp","Paper Wasp","🐝","#b7950b","meadow",true,"6","bugs","It builds a paper nest from chewed-up wood.","It helps by eating pesky caterpillars."),
+  B("clovermite","Clover Mite","🕷️","#e74c3c","meadow",false,"8","plants","It's a teeny red dot with 8 legs.","It's so small it looks like moving dust."),
+
+  // ---- JUNGLE ----
+  B("rhinobeetle","Rhinoceros Beetle","🪲","#34495e","jungle",true,"6","fruit","It has a big horn to push away rivals.","It's one of the strongest animals for its size."),
+  B("herculesbeetle","Hercules Beetle","🪲","#283747","jungle",true,"6","rotting fruit","It can be as long as your whole hand!","It can lift 850 times its own body weight."),
+  B("leafcutterant","Leafcutter Ant","🐜","#6e2c00","jungle",true,"6","fungus","It carries leaf pieces like little umbrellas.","It grows its own garden of fungus to eat."),
+  B("bluemorpho","Blue Morpho","🦋","#2e86c1","jungle",true,"6","fruit juice","Its wings flash a brilliant shiny blue.","The blue comes from tiny scales, not paint."),
+  B("walkingstick","Walking Stick","🐛","#145a32","jungle",true,"6","leaves","It looks exactly like a brown twig.","Some are longer than a ruler!"),
+  B("orchidmantis","Orchid Mantis","🦗","#fadbd8","jungle",true,"6","bugs","It is disguised as a pretty pink flower.","It waits, then snatches bugs that come close."),
+  B("goliathbeetle","Goliath Beetle","🪲","#4d5656","jungle",true,"6","tree sap","It's one of the heaviest insects alive.","Its grubs are huge and very chubby."),
+  B("giantcentipede","Giant Centipede","🐛","#922b21","jungle",false,"lots","bugs","It can grow as long as your arm!","It's a fast and fierce night hunter."),
+  B("tarantula","Tarantula","🕷️","#5b2c06","jungle",false,"8","bugs","A big hairy spider with 8 legs.","It can flick itchy hairs to defend itself."),
+  B("atlasmoth","Atlas Moth","🦋","#784212","jungle",true,"6","nothing","One of the biggest moths in the whole world.","Its wing tips look like little snake heads!"),
+
+  // ---- DESERT ----
+  B("desertscorpion","Desert Scorpion","🦂","#b9770e","desert",false,"8","bugs","It glows under moonlight and UV light.","The babies ride around on their mom's back."),
+  B("darkling","Darkling Beetle","🪲","#1b2631","desert",true,"6","dead plants","It does a headstand to drink drops of fog!","It lives where it almost never rains."),
+  B("locust","Desert Locust","🦗","#b9770e","desert",true,"6","plants","It gathers in giant buzzing swarms.","It can eat its own body weight in food a day."),
+  B("camelspider","Camel Spider","🕷️","#d4ac0d","desert",false,"8","bugs","It races super fast across the hot sand.","It has big jaws but no venom at all."),
+  B("harvesterant","Harvester Ant","🐜","#784212","desert",true,"6","seeds","It stores seeds in underground pantries.","It clears a bare circle around its nest."),
+  B("antlion","Antlion","🪲","#d68910","desert",true,"6","ants","Its baby digs sand pits to trap ants.","It grows up to look like a damselfly."),
+  B("jewelbeetle","Jewel Beetle","🪲","#1abc9c","desert",true,"6","wood","It shines and sparkles like a gemstone.","It can sense a forest fire from far away."),
+  B("dungbeetle","Dung Beetle","🪲","#4a235a","desert",true,"6","dung","It rolls animal poop into balls to eat!","It steers by looking at the stars at night."),
+  B("tarantulahawk","Tarantula Hawk","🐝","#5b2c06","desert",true,"6","nectar","The grown-up drinks flower nectar.","It hunts tarantulas to feed its babies."),
+  B("cactusbee","Cactus Bee","🐝","#f5b041","desert",true,"6","cactus nectar","It wakes up early to sip cactus flowers.","It naps tucked right inside the blooms."),
+
+  // ---- BEACH ----
+  B("hermitcrab","Hermit Crab","🦀","#e59866","beach",false,"10","food bits","It wears an empty shell as a cozy home.","It trades up to bigger shells as it grows."),
+  B("fiddlercrab","Fiddler Crab","🦀","#d35400","beach",false,"10","tiny bits","The males have one giant claw.","It waves its big claw to say hello!"),
+  B("ghostcrab","Ghost Crab","🦀","#f8c471","beach",false,"10","small creatures","It's pale as sand and super speedy.","It digs deep burrows in the beach."),
+  B("sandhopper","Sand Hopper","🦐","#f5cba7","beach",false,"lots","seaweed","It hops like a flea across the sand.","It hides under washed-up seaweed."),
+  B("horseshoecrab","Horseshoe Crab","🦀","#784212","beach",false,"lots","worms","It's even older than the dinosaurs!","It has blue blood and isn't a real crab."),
+  B("tigerbeetle","Tiger Beetle","🪲","#d4ac0d","beach",true,"6","small bugs","It's one of the fastest-running insects.","It sprints so fast it briefly can't see!"),
+  B("seaslater","Sea Slater","🪲","#95a5a6","beach",false,"lots","seaweed","It's a big beachy cousin of the woodlouse.","It scurries over rocks in the dark."),
+  B("periwinkle","Periwinkle Snail","🐌","#5d6d7e","beach",false,"none","algae","It's a little sea snail in a swirly shell.","It scrapes algae off rocks with a rough tongue."),
+  B("sandcastleworm","Sandcastle Worm","🪱","#cd6155","beach",false,"none","tiny bits","It builds a tube home out of sand grains.","Many live together like a sandy reef."),
+  B("molecrab","Sand Crab","🦀","#fdebd0","beach",false,"10","plankton","It burrows backward into the wet sand.","It catches food from the splashing waves."),
+
+  // ---- IN THE HOUSE ----
+  B("housefly","House Fly","🪰","#707b7c","house",true,"6","crumbs","It tastes food by standing on it.","Its huge eyes can see almost all around."),
+  B("silverfish","Silverfish","🐛","#aab7b8","house",true,"6","paper","It's shiny and wiggly and loves old books.","Its kind has been around 400 million years."),
+  B("housespider","House Spider","🕷️","#5d4037","house",false,"8","flies","It spins webs in cozy quiet corners.","It helps you by catching annoying flies."),
+  B("fruitfly","Fruit Fly","🪰","#f5b041","house",true,"6","ripe fruit","It loves a squishy old banana.","It grows from egg to grown-up in about a week."),
+  B("clothesmoth","Clothes Moth","🦋","#b7950b","house",true,"6","wool","Its babies nibble little holes in sweaters.","It likes dark, quiet closets."),
+  B("carpetbeetle","Carpet Beetle","🪲","#7e5109","house",true,"6","fuzz","It's tiny and round like a little speck.","Its babies munch on carpet fluff."),
+  B("sugarant","Sugar Ant","🐜","#5d4037","house",true,"6","sugar","It follows a smell trail to your snacks.","One scout ant tells the whole colony."),
+  B("booklouse","Booklouse","🐛","#d5d8dc","house",true,"6","mold","It's a tiny bug found in old damp books.","It nibbles the mold growing on paper."),
+  B("dustmite","Dust Mite","🕷️","#d7dbdd","house",false,"8","skin flakes","It's far too tiny to see without a microscope.","Millions can live in beds and pillows."),
+  B("pillmillipede","Pill Millipede","🐛","#797d7f","house",false,"lots","dead leaves","It rolls into a perfect little ball.","It sneaks into cool, damp basements."),
+
+  // ---- SPRING FLOWER PATCH ----
+  B("masonbee","Mason Bee","🐝","#5499c7","spring",true,"6","pollen","It builds its nest walls out of mud.","It's a gentle bee that almost never stings."),
+  B("springlacewing","Green Lacewing","🪰","#abebc6","spring",true,"6","aphids","It has pretty lacy, see-through wings.","It lays its eggs on tiny thread-like stalks."),
+  B("hummingbirdmoth","Hummingbird Moth","🦋","#ca6f1e","spring",true,"6","nectar","It hovers at flowers like a hummingbird!","It sips nectar through a long curly tongue."),
+  B("leafcutterbee","Leafcutter Bee","🐝","#f4d03f","spring",true,"6","pollen","It snips neat circles out of leaves.","It wraps each egg in a tiny leaf blanket."),
+  B("swallowtail","Swallowtail","🦋","#f4d03f","spring",true,"6","nectar","It has little 'tails' on its wings.","Its caterpillar puffs out a stinky orange horn."),
+  B("aphid","Aphid","🐛","#58d68d","spring",true,"6","plant juice","It's the tiny soft bug ladybugs love to eat.","It can have babies without even laying eggs!"),
+  B("pollenbeetle","Pollen Beetle","🪲","#f1c40f","spring",true,"6","pollen","It's a tiny beetle that snoozes in flowers.","It dusts itself all over in golden pollen."),
+  B("springladybug","7-Spot Ladybug","🐞","#cb4335","spring",true,"6","aphids","It wakes in spring to hunt hungry aphids.","Count its spots — this one has seven!"),
+  B("earlybumble","Spring Bumblebee","🐝","#e67e22","spring",true,"6","nectar","It's one of the first bees out in spring.","It warms up by shivering its flight muscles."),
+  B("orbweaver","Orb Weaver Spider","🕷️","#58d68d","spring",false,"8","flies","It spins a beautiful wheel-shaped web.","It builds a brand-new web almost every day."),
+];
+
+/* The legendary, imaginary Azari Bug 🌈 */
+const AZARI = {
+  name:"The Azari Bug", emoji:"🪲", color:"#9b59b6",
+  facts:[
+    ["🌈","The Azari Bug is the rarest, most magical bug in the WHOLE world!"],
+    ["⚡","It glows every color of the rainbow and zooms faster than any other bug."],
+    ["👑","It only shows itself to the bravest, smartest bug hunter of all — Azari!"]
+  ]
+};
+
+/* =========================================================================
+   ENGINE
+   ========================================================================= */
+const $ = id => document.getElementById(id);
+const scene = $("scene");
+const found = new Set();
+let cur = 0;               // current scene index
+let azariCount = 0;        // how many times the Azari Bug appeared
+let sinceAzari = 0;        // searches since last Azari Bug
+const SPOT_POS = [[14,30],[40,40],[66,28],[84,46]];   // [left%, bottom%]
+const DECOR_POS = [[7,16],[26,11],[47,18],[66,12],[83,20],[16,58],[58,62],[88,55]];
+
+function sceneById(id){ return SCENES.find(s=>s.id===id); }
+function bugById(id){ return BUGS.find(b=>b.id===id); }
+function sceneBugs(idx){ return BUGS.filter(b=>b.scene===SCENES[idx].id); }
+function discSize(px){ return px; }
+
+/* ---- emoji disc helper ---- */
+function disc(emoji, color, size){
+  const pad = Math.round(size*0.16);
+  return `<span class="disc" style="background:radial-gradient(circle at 35% 30%, ${tint(color,40)}, ${color});
+    width:${size}px;height:${size}px;font-size:${size-pad*2}px;">${emoji}</span>`;
+}
+function tint(hex,amt){
+  const n=parseInt(hex.slice(1),16); let r=(n>>16)+amt,g=((n>>8)&255)+amt,b=(n&255)+amt;
+  r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+
+/* ---- Sound ---- */
+let actx=null;
+function aInit(){ if(!actx){ try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(actx&&actx.state==="suspended") actx.resume(); }
+function tone(freq,dur,type,when){ if(!actx)return; const t=actx.currentTime+(when||0);
+  const o=actx.createOscillator(),g=actx.createGain(); o.type=type||"sine"; o.frequency.setValueAtTime(freq,t);
+  g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.3,t+.02); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+dur+.02); }
+const sndFind  = ()=>{ tone(523,.12,"sine",0); tone(784,.18,"sine",.1); };
+const sndRight = ()=>{ [659,880,1046].forEach((f,i)=>tone(f,.18,"sine",i*.1)); };
+const sndWrong = ()=>{ tone(196,.18,"triangle",0); };
+const sndWin   = ()=>{ [523,659,784,1046,1318].forEach((f,i)=>tone(f,.25,"sine",i*.13)); };
+const sndAzari = ()=>{ [523,659,784,1046,1318,1568].forEach((f,i)=>tone(f,.22,"triangle",i*.09)); tone(2093,.4,"sine",.6); };
+
+/* ---- Speech ---- */
+function speak(text){ if(!("speechSynthesis" in window))return; speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text); u.rate=.92; u.pitch=1.15; speechSynthesis.speak(u); }
+
+/* ---- Build a scene ---- */
+function buildScene(idx){
+  cur=(idx+SCENES.length)%SCENES.length;
+  const s=SCENES[cur];
+  scene.style.background=s.bg;
+  $("scene-name").textContent=`${s.emoji} ${s.name}`;
+  $("scene-name").style.color=s.ink;
+  scene.innerHTML="";
+  // decorations
+  DECOR_POS.forEach((p,i)=>{
+    const d=document.createElement("div"); d.className="decor";
+    d.textContent=s.decor[i%s.decor.length];
+    d.style.left=p[0]+"%"; d.style.top=p[1]+"%";
+    d.style.fontSize=(34+ (i%3)*16)+"px";
+    d.style.opacity = (s.id==="night" && ["⭐","✨","🌙"].includes(d.textContent)) ? .95 : .8;
+    scene.appendChild(d);
+  });
+  // dig spots
+  s.spots.forEach((art,i)=>{
+    const pos=SPOT_POS[i%SPOT_POS.length];
+    const el=document.createElement("div"); el.className="spot"; el.dataset.i=i;
+    el.style.left=pos[0]+"%"; el.style.bottom=pos[1]+"%";
+    el.innerHTML=`<span class="hint">✨</span><span class="art">${art}</span><span class="label">Search!</span>`;
+    el.addEventListener("pointerdown",()=>searchSpot(el));
+    scene.appendChild(el);
+  });
+  refreshHints();
+}
+function refreshHints(){
+  const remaining = sceneBugs(cur).filter(b=>!found.has(b.id)).length;
+  scene.querySelectorAll(".spot .hint").forEach(h=> h.textContent = remaining? "✨" : "✓");
+  scene.querySelectorAll(".spot .label").forEach(l=> l.textContent = remaining? "Search!" : "All found!");
+}
+
+/* ---- Searching ---- */
+function searchSpot(el){
+  aInit();
+  el.classList.remove("searched"); void el.offsetWidth; el.classList.add("searched");
+  sinceAzari++;
+  // Azari Bug surprise: ~1 per 15 finds (guaranteed by 15)
+  const azari = (sinceAzari>=15) || (sinceAzari>=4 && Math.random()<1/15);
+  if(azari){ sinceAzari=0; popOut(el,`<span style="filter:drop-shadow(0 0 8px gold)">🪲🌈</span>`,()=>showAzari()); sndFind(); return; }
+
+  const remaining = sceneBugs(cur).filter(b=>!found.has(b.id));
+  if(remaining.length===0){ floatText(el,"All found here! ✨"); sndFind();
+    speak(`You found every bug here, ${NAME}! Try another place with the arrows.`); return; }
+  const b = remaining[Math.floor(Math.random()*remaining.length)];
+  popOut(el, disc(b.emoji,b.color,54), ()=>showBug(b)); sndFind();
+}
+function popOut(el, html, cb){
+  const fb=document.createElement("div"); fb.className="found-bug"; fb.innerHTML=html;
+  const r=el.getBoundingClientRect(); fb.style.left=(r.left+r.width/2)+"px"; fb.style.top=r.top+"px";
+  document.body.appendChild(fb); setTimeout(()=>{ fb.remove(); cb(); }, 520);
+}
+function floatText(el,msg){
+  const t=document.createElement("div"); t.className="found-bug";
+  t.style.fontSize="22px"; t.style.fontWeight="bold"; t.style.color="#fff"; t.style.textShadow="0 2px 4px rgba(0,0,0,.6)";
+  t.textContent=msg; const r=el.getBoundingClientRect(); t.style.left=(r.left+r.width/2)+"px"; t.style.top=r.top+"px";
+  document.body.appendChild(t); setTimeout(()=>t.remove(),900);
+}
+
+/* ---- Bug card ---- */
+const LEGS_LABEL = { "6":"6 legs", "8":"8 legs", "10":"10 legs", "lots":"lots of legs", "none":"no legs" };
+function showBug(b){
+  const isNew=!found.has(b.id); found.add(b.id); updateHud(); refreshHints();
+  const factText=b.facts.map(f=>f[1]).join(" ");
+  const card=$("bug-card"); card.className="card"; card.style.borderColor=b.color;
+  card.innerHTML=`
+    <div class="bug-disc">${disc(b.emoji,b.color,Math.min(118, Math.round(window.innerWidth*0.26)))}</div>
+    <div class="bug-name">${b.name}</div>
+    <div class="bug-tag ${b.insect?'':'notbug'}">${b.insect?'🐛 Insect · '+LEGS_LABEL[b.legs]:'❗ NOT an insect · '+LEGS_LABEL[b.legs]}</div>
+    <ul class="facts">${b.facts.map(f=>`<li><span class="fi">${f[0]||'🔎'}</span><span>${f[1]}</span></li>`).join('')}</ul>
+    <div class="card-btns">
+      <button class="pill-btn btn-hear" id="hear-btn">🔊 Hear it</button>
+      <button class="pill-btn btn-go" id="keep-btn">${isNew?'Catch it! 🫙':'Cool! 👍'}</button>
+    </div>`;
+  $("bug-overlay").classList.add("show");
+  $("hear-btn").onclick=()=>speak(`${b.name}. ${factText}`);
+  $("keep-btn").onclick=()=>{ closeAll(); if(isNew) confetti(innerWidth/2,innerHeight/2,b.color); };
+  speak(`${isNew?'Great job '+NAME+'! You found a':NAME+', here is the'} ${b.name}. ${b.facts[0][1]}`);
+  if(isNew) confetti(innerWidth/2, innerHeight*0.4, b.color);
+}
+
+/* ---- Azari Bug ---- */
+function showAzari(){
+  azariCount++; updateHud();
+  const card=$("bug-card"); card.className="card azari-card";
+  card.innerHTML=`
+    <div class="azari-creature">
+      <span class="ac-crown">👑</span><span class="ac-body">🪲</span>
+      <span class="ac-spark s1">✨</span><span class="ac-spark s2">🌟</span>
+      <span class="ac-spark s3">✨</span><span class="ac-spark s4">🌟</span>
+    </div>
+    <div class="bug-name">🌈 The Azari Bug! 🌈</div>
+    <div class="bug-tag" style="background:linear-gradient(90deg,#ff5fa2,#5aa9ff)">⭐ LEGENDARY · super rare!</div>
+    <ul class="facts">${AZARI.facts.map(f=>`<li><span class="fi">${f[0]}</span><span>${f[1]}</span></li>`).join('')}</ul>
+    <div class="card-btns">
+      <button class="pill-btn btn-hear" id="hear-btn">🔊 Hear it</button>
+      <button class="pill-btn btn-go" id="keep-btn">WOW! 🌈</button>
+    </div>`;
+  $("bug-overlay").classList.add("show");
+  const txt = `Woah ${NAME}! You found the legendary Azari Bug! ${AZARI.facts.map(f=>f[1]).join(' ')}`;
+  $("hear-btn").onclick=()=>speak(txt);
+  $("keep-btn").onclick=()=>closeAll();
+  sndAzari(); speak(txt);
+  for(let i=0;i<5;i++) setTimeout(()=>confetti(Math.random()*innerWidth, innerHeight*0.35,
+    ["#ff5fa2","#ffd23f","#4caf50","#5aa9ff","#b06bff"][i]), i*180);
+}
+
+/* ---- HUD / nav ---- */
+function updateHud(){
+  $("jar-count").textContent=found.size;
+  $("azari-count").textContent=azariCount;
+  const q=$("quiz-btn"); if(found.size>=3) q.removeAttribute("disabled"); else q.setAttribute("disabled","");
+}
+
+/* ---- Collection jar ---- */
+function openJar(){
+  const body=$("jar-body"); body.innerHTML="";
+  SCENES.forEach((s,idx)=>{
+    const bugs=sceneBugs(idx); const haveN=bugs.filter(b=>found.has(b.id)).length;
+    const head=document.createElement("div"); head.className="scene-head";
+    head.innerHTML=`<span>${s.emoji} ${s.name}</span><span style="margin-left:auto;color:${s.ink}">${haveN}/${bugs.length}</span>`;
+    body.appendChild(head);
+    const grid=document.createElement("div"); grid.className="grid";
+    bugs.forEach(b=>{
+      const have=found.has(b.id); const slot=document.createElement("div");
+      slot.className="slot "+(have?"have":"miss");
+      slot.innerHTML = have
+        ? `${disc(b.emoji,b.color,40)}<div class="sn">${b.name}</div>`
+        : `<div class="qm">❓</div><div class="sn">???</div>`;
+      if(have) slot.onclick=()=>{ $("jar-overlay").classList.remove("show"); showBug(b); };
+      grid.appendChild(slot);
+    });
+    body.appendChild(grid);
+  });
+  $("jar-sub").textContent = found.size===BUGS.length
+    ? `${NAME} found ALL 100 bugs! 🏆` : `${NAME} found ${found.size} of 100 bugs  ·  🌈 ${azariCount} Azari Bugs`;
+  closeAll(); $("jar-overlay").classList.add("show");
+}
+
+/* ---- Quiz (auto-built from bugs Azari has found) ---- */
+const EATS_POOL = [...new Set(BUGS.map(b=>b.eats))];
+const SCENE_NAMES = SCENES.map(s=>s.name);
+let quizDeck=[], quizIdx=0, quizScore=0, quizLocked=false;
+
+function sample(arr,n,not){ const pool=arr.filter(x=>x!==not); const out=[];
+  while(out.length<n && pool.length){ out.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]); } return out; }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function makeQuestion(b){
+  const dims=["legs","insect","eats","home"]; const dim=dims[Math.floor(Math.random()*dims.length)];
+  let q, correct, options;
+  if(dim==="legs"){ q=`How many legs does the ${b.name} have?`; correct=LEGS_LABEL[b.legs];
+    options=[correct,...sample(Object.values(LEGS_LABEL),2,correct)]; }
+  else if(dim==="insect"){ q=`Is the ${b.name} an insect?`; correct=b.insect?"Yes! 🐛":"No! 🚫";
+    options=["Yes! 🐛","No! 🚫"]; }
+  else if(dim==="eats"){ q=`What does the ${b.name} like to eat?`; correct=b.eats;
+    options=[correct,...sample(EATS_POOL,2,correct)]; }
+  else { q=`Where would you find the ${b.name}?`; correct=sceneById(b.scene).name;
+    options=[correct,...sample(SCENE_NAMES,2,correct)]; }
+  return { emoji:b.emoji, color:b.color, q, correct, options:shuffle(options) };
+}
+function startQuiz(){
+  aInit(); const pool=BUGS.filter(b=>found.has(b.id)); if(pool.length<3)return;
+  quizDeck=shuffle(pool.slice()).slice(0,8).map(makeQuestion); quizIdx=0; quizScore=0;
+  closeAll(); $("quiz-overlay").querySelector(".card").className="card";
+  $("quiz-overlay").classList.add("show"); renderQuiz();
+}
+function renderQuiz(){
+  quizLocked=false; const item=quizDeck[quizIdx];
+  $("quiz-progress").textContent=`Question ${quizIdx+1} of ${quizDeck.length}   ⭐ ${quizScore}`;
+  $("quiz-disc").innerHTML=disc(item.emoji,item.color,64);
+  $("quiz-q").textContent=item.q; $("quiz-feedback").textContent="";
+  const wrap=$("quiz-answers"); wrap.innerHTML="";
+  item.options.forEach(opt=>{ const btn=document.createElement("button"); btn.className="ans"; btn.textContent=opt;
+    btn.onclick=()=>answer(btn,opt===item.correct); wrap.appendChild(btn); });
+  speak(item.q);
+}
+function answer(btn,correct){
+  if(quizLocked)return;
+  if(correct){ quizLocked=true; btn.classList.add("right"); sndRight(); quizScore++;
+    confetti(innerWidth/2,innerHeight/2,"#4caf50");
+    const yays=["Yes, "+NAME+"! 🎉","Correct, "+NAME+"! 🌟","You got it, "+NAME+"! 👏",NAME+" the bug genius! 🐛","Smart, "+NAME+"! 🍪"];
+    const y=yays[Math.floor(Math.random()*yays.length)];
+    $("quiz-feedback").textContent=y; $("quiz-feedback").style.color="#2c7a2c"; speak(y);
+    setTimeout(()=>{ quizIdx++; if(quizIdx<quizDeck.length) renderQuiz(); else finishQuiz(); },1300);
+  } else { btn.classList.add("wrong"); sndWrong(); btn.disabled=true;
+    $("quiz-feedback").textContent="Try again! 🤔"; $("quiz-feedback").style.color="#c44";
+    setTimeout(()=>btn.classList.remove("wrong"),500); }
+}
+function finishQuiz(){
+  sndWin(); const card=$("quiz-overlay").querySelector(".card"); const perfect=quizScore===quizDeck.length;
+  card.innerHTML=`
+    <div style="font-size:clamp(70px,17vw,110px)">${perfect?'🏆':'🌟'}</div>
+    <div class="bug-name" style="color:#4caf50">${perfect?NAME+' the Bug Scientist!':'Great Job, '+NAME+'!'}</div>
+    <div class="bug-tag" style="background:#7bd151">You got ${quizScore} of ${quizDeck.length} right!</div>
+    <p style="font-size:clamp(17px,4.2vw,23px); color:#3a4a3a; margin:14px 0 20px;">
+      ${perfect?'Wow '+NAME+', you remembered every bug fact! 🐞🦋🐝':'Find more bugs and try again, '+NAME+'!'}</p>
+    <div class="card-btns">
+      <button class="pill-btn btn-hear" onclick="startQuiz()">🔁 Play Again</button>
+      <button class="pill-btn btn-go" onclick="closeAll()">🔍 Keep Hunting</button>
+    </div>`;
+  for(let i=0;i<4;i++) setTimeout(()=>confetti(Math.random()*innerWidth, innerHeight*0.3,
+    ["#ffd23f","#ff5fa2","#4caf50","#5aa9ff"][i]), i*250);
+  speak((perfect?NAME+", you are a real bug scientist! ":"Great job, "+NAME+"! ")+`You got ${quizScore} out of ${quizDeck.length} right.`);
+}
+
+/* ---- helpers ---- */
+function closeAll(){ document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("show")); if("speechSynthesis" in window) speechSynthesis.cancel(); }
+function confetti(x,y,color){
+  const colors=[color,"#ffd23f","#ff5fa2","#4caf50","#5aa9ff","#b06bff"];
+  for(let i=0;i<18;i++){ const p=document.createElement("div"); p.className="particle";
+    const s=6+Math.random()*8; p.style.width=s+"px"; p.style.height=s+"px"; p.style.left=x+"px"; p.style.top=y+"px";
+    p.style.background=colors[Math.floor(Math.random()*colors.length)]; document.body.appendChild(p);
+    const ang=(Math.PI*2*i)/18+Math.random(); const vel=130+Math.random()*200;
+    let vx=Math.cos(ang)*vel, vy=Math.sin(ang)*vel-90, px=x,py=y,life=0,last=null;
+    function fly(ts){ if(last===null)last=ts; const dt=(ts-last)/1000; last=ts; life+=dt;
+      vy+=620*dt; px+=vx*dt; py+=vy*dt; p.style.transform=`translate(${px-x}px,${py-y}px) rotate(${life*540}deg)`;
+      p.style.opacity=Math.max(0,1-life); if(life<1) requestAnimationFrame(fly); else p.remove(); }
+    requestAnimationFrame(fly); }
+}
+
+/* ---- magnifier cursor ---- */
+const lens=$("lens");
+addEventListener("pointermove",e=>{ if(e.pointerType==="mouse"){ lens.style.display="block"; lens.style.left=e.clientX+"px"; lens.style.top=e.clientY+"px"; } });
+
+/* ---- wire up ---- */
+$("start-btn").addEventListener("pointerdown",()=>{ aInit(); $("title").style.display="none"; });
+$("jar-btn").addEventListener("pointerdown",openJar);
+$("azari-badge").addEventListener("pointerdown",()=>{ floatTop(`🌈 Azari Bugs found: ${azariCount}`); });
+$("quiz-btn").addEventListener("pointerdown",e=>{ if(!e.currentTarget.hasAttribute("disabled")) startQuiz(); });
+$("prev").addEventListener("pointerdown",()=>{ closeAll(); buildScene(cur-1); });
+$("next").addEventListener("pointerdown",()=>{ closeAll(); buildScene(cur+1); });
+$("bug-overlay").addEventListener("pointerdown",e=>{ if(e.target.id==="bug-overlay") closeAll(); });
+
+function floatTop(msg){ const t=document.createElement("div"); t.textContent=msg;
+  t.style.cssText="position:fixed;top:96px;left:50%;transform:translateX(-50%);z-index:70;background:#9b59b6;color:#fff;font-weight:bold;padding:8px 18px;border-radius:999px;box-shadow:0 4px 12px rgba(0,0,0,.3);font-size:18px";
+  document.body.appendChild(t); setTimeout(()=>t.remove(),1600); }
+
+buildScene(0); updateHud();
+</script>
+</body>
+</html>
