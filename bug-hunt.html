@@ -479,13 +479,14 @@ function floatText(el,msg){
 const LEGS_LABEL = { "6":"6 legs", "8":"8 legs", "10":"10 legs", "lots":"lots of legs", "none":"no legs" };
 function showBug(b){
   const isNew=!found.has(b.id); found.add(b.id); updateHud(); refreshHints();
-  const factText=b.facts.map(f=>f[1]).join(" ");
+  const factText=b.facts.join(" ");
+  const FICON=["🔎","💡","✨"];
   const card=$("bug-card"); card.className="card"; card.style.borderColor=b.color;
   card.innerHTML=`
     <div class="bug-disc">${disc(b.emoji,b.color,Math.min(118, Math.round(window.innerWidth*0.26)))}</div>
     <div class="bug-name">${b.name}</div>
     <div class="bug-tag ${b.insect?'':'notbug'}">${b.insect?'🐛 Insect · '+LEGS_LABEL[b.legs]:'❗ NOT an insect · '+LEGS_LABEL[b.legs]}</div>
-    <ul class="facts">${b.facts.map(f=>`<li><span class="fi">${f[0]||'🔎'}</span><span>${f[1]}</span></li>`).join('')}</ul>
+    <ul class="facts">${b.facts.map((f,i)=>`<li><span class="fi">${FICON[i%FICON.length]}</span><span>${f}</span></li>`).join('')}</ul>
     <div class="card-btns">
       <button class="pill-btn btn-hear" id="hear-btn">🔊 Hear it</button>
       <button class="pill-btn btn-go" id="keep-btn">${isNew?'Catch it! 🫙':'Cool! 👍'}</button>
@@ -493,7 +494,7 @@ function showBug(b){
   $("bug-overlay").classList.add("show");
   $("hear-btn").onclick=()=>speak(`${b.name}. ${factText}`);
   $("keep-btn").onclick=()=>{ closeAll(); if(isNew) confetti(innerWidth/2,innerHeight/2,b.color); };
-  speak(`${isNew?'Great job '+NAME+'! You found a':NAME+', here is the'} ${b.name}. ${b.facts[0][1]}`);
+  speak(`${isNew?'Great job '+NAME+'! You found a':NAME+', here is the'} ${b.name}. ${b.facts[0]}`);
   if(isNew) confetti(innerWidth/2, innerHeight*0.4, b.color);
 }
 
