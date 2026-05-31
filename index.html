@@ -410,9 +410,23 @@ const sndWrong = ()=>{ tone(196,.18,"triangle",0); };
 const sndWin   = ()=>{ [523,659,784,1046,1318].forEach((f,i)=>tone(f,.25,"sine",i*.13)); };
 const sndAzari = ()=>{ [523,659,784,1046,1318,1568].forEach((f,i)=>tone(f,.22,"triangle",i*.09)); tone(2093,.4,"sine",.6); };
 
-/* ---- Speech ---- */
-function speak(text){ if(!("speechSynthesis" in window))return; speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text); u.rate=.92; u.pitch=1.15; speechSynthesis.speak(u); }
+/* ---- Speech — pick a nice natural voice instead of the default robot ---- */
+let preferredVoice = null;
+function pickVoice(){
+  if(!("speechSynthesis" in window)) return null;
+  const vs = speechSynthesis.getVoices(); if(!vs.length) return null;
+  const prefs = [/online \(natural\)/i,/natural/i,/samantha/i,/\bava\b/i,/aria/i,/jenny/i,/nicky/i,/karen/i,/serena/i,/moira/i,/google us english/i,/google uk english female/i,/microsoft/i];
+  for(const re of prefs){ const v=vs.find(v=>re.test(v.name) && /^en/i.test(v.lang)); if(v) return v; }
+  return vs.find(v=>/en[-_]US/i.test(v.lang)) || vs.find(v=>/^en/i.test(v.lang)) || vs[0];
+}
+if("speechSynthesis" in window){ try{ speechSynthesis.onvoiceschanged=()=>{ preferredVoice=pickVoice(); }; }catch(e){} }
+function speak(text){
+  if(!("speechSynthesis" in window))return; speechSynthesis.cancel();
+  if(!preferredVoice) preferredVoice=pickVoice();
+  const u=new SpeechSynthesisUtterance(text);
+  if(preferredVoice){ u.voice=preferredVoice; u.lang=preferredVoice.lang; }
+  u.rate=.95; u.pitch=1.05; speechSynthesis.speak(u);
+}
 
 /* ---- Build a scene ---- */
 function buildScene(idx){
